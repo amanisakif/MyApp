@@ -1,0 +1,135 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TripRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+enum PlaceCategory {
+  COFFEE
+  ATTRACTION
+  HOTEL
+  RESTAURANT
+  BAR
+  OTHER
+}
+
+model User {
+  id        String       @id @default(uuid())
+  email     String       @unique
+  name      String?
+  phone     String?
+  avatarUrl String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  trips        Trip[]        @relation("UserTrips")
+  memberships  Membership[]
+  favorites    Favorite[]
+  itinerary    ItineraryItem[] @relation("AssignedItems")
+}
+
+model Place {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  category    PlaceCategory
+  latitude    Float
+  longitude   Float
+  address     String?
+  city        String?
+  country     String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  itineraryItems ItineraryItem[]
+  favorites      Favorite[]
+}
+
+model Trip {
+  id          String        @id @default(uuid())
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  ownerId     String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  owner        User          @relation("UserTrips", fields: [ownerId], references: [id])
+  days         TripDay[]
+  memberships  Membership[]
+  favorites    Favorite[]
+}
+
+model TripDay {
+  id        String          @id @default(uuid())
+  tripId    String
+  date      DateTime
+  position  Int
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  trip   Trip              @relation(fields: [tripId], references: [id])
+  items  ItineraryItem[]
+}
+
+model ItineraryItem {
+  id          String       @id @default(uuid())
+  tripDayId   String
+  placeId     String?
+  assignedToId String?
+  title       String
+  notes       String?
+  startTime   DateTime?
+  endTime     DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  tripDay    TripDay       @relation(fields: [tripDayId], references: [id])
+  place      Place?        @relation(fields: [placeId], references: [id])
+  assignedTo User?         @relation("AssignedItems", fields: [assignedToId], references: [id])
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  tripId    String?
+  placeId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  trip  Trip? @relation(fields: [tripId], references: [id])
+  place Place @relation(fields: [placeId], references: [id])
+
+  @@unique([userId, placeId])
+}
+
+model Membership {
+  id        String   @id @default(uuid())
+  userId    String
+  tripId    String
+  role      TripRole @default(VIEWER)
+  invitedAt DateTime @default(now())
+  joinedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+  trip Trip @relation(fields: [tripId], references: [id])
+
+  @@unique([userId, tripId])
+}
